@@ -1,0 +1,9 @@
+train: train/
+valid: valid/
+test: test/
+
+# number of classes
+nc: 2
+
+# class names
+names: ["bad","good"]
