@@ -1,0 +1,6 @@
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+openpyxl>=3.1        # чтение .xlsx
+ultralytics>=8.2     # YOLOv8-cls
+customtkinter>=5.2   # окно оператора (main.py gui)

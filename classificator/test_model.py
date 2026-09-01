@@ -1,31 +1,49 @@
-import time
+"""Проверка обученной модели на размеченном сплите.
 
-from ultralytics import YOLO
-import cv2
-import  os
-import shutil
-import customtkinter
+Было: жёстко зашитый путь ``C:\\Users\\User\\...``, предикт по одной
+картинке в цикле, ``cv2.imshow`` + ``waitKey(0)`` на каждом кадре (скрипт
+невозможно прогнать без оператора у монитора) и импорт customtkinter,
+который здесь вообще не использовался. Стало: параметры из командной
+строки, батчевый предикт и метрики.
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import config as cfg_mod
+from Class_Predict import BeltPredictor, format_report
 
 
-customtkinter.set_appearance_mode("dark")
-customtkinter.set_default_color_theme("blue") # Themes: blue (default), dark-blue, green
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Метрики классификатора на размеченной папке")
+    parser.add_argument("--weights", type=Path, default=cfg_mod.DEFAULT_WEIGHTS)
+    parser.add_argument("--split", default="valid", help="train | valid | test")
+    parser.add_argument("--dataset", type=Path, default=cfg_mod.DATASET_DIR)
+    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--errors", action="store_true", help="показать список ошибок")
+    args = parser.parse_args()
+
+    split_dir = args.dataset / args.split
+    if not split_dir.is_dir():
+        raise SystemExit(f"Нет сплита: {split_dir}")
+
+    predictor = BeltPredictor(args.weights)
+    report = predictor.evaluate(split_dir, args.batch)
+    print(format_report(report, predictor.names))
+
+    if args.errors:
+        print("\nОшибки:")
+        for class_dir in sorted(p for p in split_dir.iterdir() if p.is_dir()):
+            for pred in predictor.predict(class_dir, args.batch):
+                if pred.label != class_dir.name:
+                    print(f"  {pred.path.name}: истина {class_dir.name}, модель {pred.label} ({pred.confidence:.2f})")
 
 
-model = YOLO("runs/classify/train2/weights/best.pt")
-dirr = r"C:\Users\User\Documents\projects\belt\dataset\valid\bad"
-
-for filename in os.listdir(dirr):
-    if not filename.endswith("png"):
-        continue
-    results = model.predict(source=os.path.join(dirr, filename), verbose=False)
-    conf = results[0].probs.data.tolist()
-    idx = conf.index(max(conf))
-
-    cv2.imshow("0", cv2.imread(os.path.join(dirr, filename)))
-    print(f'idx = {idx}, filename = {filename}')
-    image = cv2.imread(os.path.join(dirr, filename))
-    #if int(idx) == 1:
-    cv2.imshow("0", image)
-    cv2.waitKey(0)
-        #time.sleep(100)
-    #    shutil.move(os.path.join(dirr, filename), "dataset/tmp/true/"+filename)
+if __name__ == "__main__":
+    main()
